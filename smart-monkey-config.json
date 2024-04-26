@@ -1,6 +1,6 @@
 {
     "projectId":"TSDL-Smart-Monkey-with-cypress",
-    "baseUrl":"https://losestudiantes.com/",
+    "baseUrl":"http://localhost:2368/ghost/#/signin/",
     "env":{
         "appName":"App prueba",
         "events":50,

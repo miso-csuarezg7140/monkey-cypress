@@ -1,21 +1,26 @@
-//Import
-require('cypress-plugin-tab')
-var fs = require('fs')
+//Imports
+require('cypress-plugin-tab');
+var fs = require('fs');
+var faker = require('faker');
 
-const url = Cypress.config('baseUrl') || "https://uniandes.edu.co/"
-const appName = Cypress.env('appName')|| "your app"
-const events = Cypress.env('events')|| 100
-const delay = Cypress.env('delay') || 100
-var seed = Cypress.env('seed')
+const url = Cypress.config('baseUrl') || "http://localhost:2368/ghost/#/signin/";
+const appName = Cypress.env('appName')|| "your app";
+const events = Cypress.env('events')|| 100;
+const delay = Cypress.env('delay') || 100;
+var seed = Cypress.env('seed');
 
-const pct_clicks = Cypress.env('pctClicks') || 19
-const pct_scrolls = Cypress.env('pctScroll') || 17
-const pct_selectors = Cypress.env('pctSelectors') || 16
-const pct_keys = Cypress.env('pctKeys') || 16
-const pct_spkeys = Cypress.env('pctSpKeys') || 16
-const pct_pgnav = Cypress.env('pctPgNav') || 16 
+const num_categories = 7;
 
-const LOG_FILENAME = "../../../results/monkey-execution.html"
+const pct_clicks = Cypress.env('pctClicks') || 12;
+const pct_scrolls = Cypress.env('pctScroll') || 12;
+const pct_selectors = Cypress.env('pctSelectors') || 12;
+const pct_keys = Cypress.env('pctKeys') || 12;
+const pct_spkeys = Cypress.env('pctSpKeys') || 12;
+const pct_pgnav = Cypress.env('pctPgNav') || 12; 
+const pct_browserChaos = Cypress.env('pctBwChaos') || 12;
+const pct_actions = Cypress.env('pctActions') || 16;
+
+const LOG_FILENAME = "../../../results/smart-monkey-execution.html";
 
 /*
  Bob Jenkins Small Fast, aka smallprng pseudo random number generator is the chosen selection for introducing seeding in the tester
@@ -23,22 +28,28 @@ const LOG_FILENAME = "../../../results/monkey-execution.html"
 */
 function jsf32(a, b, c, d) {
     return function() {
-        a |= 0; b |= 0; c |= 0; d |= 0
-        var t = a - (b << 27 | b >>> 5) | 0
-        a = b ^ (c << 17 | c >>> 15)
-        b = c + d | 0
-        c = d + t | 0
-        d = a + t | 0
-        return (d >>> 0) / 4294967296
+        a |= 0; b |= 0; c |= 0; d |= 0;
+        var t = a - (b << 27 | b >>> 5) | 0;
+        a = b ^ (c << 17 | c >>> 15);
+        b = c + d | 0;
+        c = d + t | 0;
+        d = a + t | 0;
+        return (d >>> 0) / 4294967296;
     }
 }
 
-var random = jsf32(0xF1AE533D, seed, seed, seed)
+function login(email, password) {
+    cy.get('input[name="identification"]').should('be.visible').type(email);
+    cy.get('input[name="password"]').should('be.visible').type(password);
+    cy.get('button[type="submit"]').should('be.visible').click();
+}
+
+var random = jsf32(0xF1AE533D, seed, seed, seed);
 
 function getRandomInt(min, max) {
-    min = Math.ceil(min)
-    max = Math.floor(max)
-    return Math.floor(random() * (max - min)) + min
+    min = Math.ceil(min);
+    max = Math.floor(max);
+    return Math.floor(random() * (max - min)) + min;
 }
 
 function fullPath(el){
@@ -57,13 +68,20 @@ function fullPath(el){
       }
     }
     return names.join(" > ");
-  }
+}
 
+function logCommand(index, funtype, info){
+    let html = `<h2>(${index}.) ${funtype} event</h2>`
+    if(!!info) html+=`<p><strong>Details: </strong> ${info}</p>`
+    fs.appendFile(LOG_FILENAME, html, (err) => {
+        if (err) throw err;
+        console.log(`Logged #${index}`);
+    });
+}
 
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//Start of random monkey
+//Start of smart monkey
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-
 var viewportHeight = Cypress.config("viewportHeight")
 var viewportWidth = Cypress.config("viewportWidth")
 var curX = 0
@@ -84,7 +102,7 @@ function randClick(){
         if(!!element){
             //Use cypress selector if any fits
             if(!!element.id){ //boolean that indicates if the element has a non-empty id
-                cy.get(`#${element.id}`).click({force: true})
+                cy.get(`#${element.id}`).click()
                 info = `${element.tagName} with id: ${element.id}`
             }
             /*
@@ -138,7 +156,7 @@ function randDClick(){
         if(!!element){
             //Use cypress selector if any fits
             if(!!element.id){ //boolean that indicates if the element has a non-empty id
-                cy.get(`#${element.id}`).dblclick({force: true})
+                cy.get(`#${element.id}`).dblclick()
                 info = `${element.tagName} with id: ${element.id}`
             }
             /*
@@ -162,7 +180,7 @@ function randDClick(){
                     for(let i = 0; i < $candidates.length; i++){
                         let candidate = $candidates.get(i)
                         if(!Cypress.dom.isHidden(candidate)){
-                            cy.wrap(candidate).dblclick({force: true})
+                            cy.wrap(candidate).dblclick({force:true})
                             break
                         }
                     }
@@ -171,7 +189,7 @@ function randDClick(){
             }
         }
         else{
-            cy.get('body').dblclick(randX, randY, {force: true})
+            cy.get('body').dblclick(randX, randY, {force:true})
             info = `Position: (${randX}, ${randY}). INVALID, no selectable element`
         }
         cy.task("logCommand", { funtype: "Random double click", info: info})
@@ -288,11 +306,11 @@ function avPag(){
     if(curPageMaxY - curY >= viewportHeight){ 
         if(curPageMaxY - (curY + viewportHeight) >= viewportHeight){
             curY = curY + viewportHeight
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
         } 
         else{
             curY = curPageMaxY - viewportHeight
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
             info += "Page limit reached! "
         }
         info += `Successfully scrolled down from y=${prev} to y=${curY}`
@@ -312,12 +330,12 @@ function rePag(){
     else{
         if(viewportHeight > curY){
             curY =  0
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
             info += "Page limit reached! "
         }
         else{
             curY = curY - viewportHeight
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
         }
         info += `Successfully scrolled up from y=${prev} to y=${curY}`
     }
@@ -330,11 +348,11 @@ function horizontalScrollFw(){
     if(curPageMaxX - curX >= viewportWidth){ 
         if(curPageMaxX - (curX + viewportWidth) >= viewportWidth){
             curX = curX + viewportWidth
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
         } 
         else{
             curX = curPageMaxX - viewportWidth
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
             info += "Page limit reached! "
         }
         info += `Successfully scrolled to the right from x=${prev} to x=${curX}`
@@ -354,12 +372,12 @@ function horizontalScrollBk(){
     else{
         if(viewportWidth > curX){
             curX =  0
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
             info += "Page limit reached! "
         }
         else{
             curX = curX - viewportWidth
-            cy.scrollTo(curX, curY)
+            //cy.scrollTo(curX, curY)
         }
         info += `Successfully scrolled to the left from x=${prev} to x=${curX}`
     }
@@ -468,6 +486,138 @@ function tab(){
     cy.task("logCommand", { funtype: "Selector focus (tab)", info: info})
 }
 
+
+function clickRandAnchor(){
+    cy.window().then((win)=>{
+        let $links = win.document.getElementsByTagName("a");
+        let info = ""
+        if($links.length > 0){
+            let randomLink = $links.item(getRandomInt(0, $links.length));
+            if(!Cypress.dom.isHidden(randomLink)) {
+                cy.wrap(randomLink).click({force: true});
+                info = `Clicked link to: ${randomLink.href}`
+            } else info = `Link to ${randomLink.href} is hidden`
+        } else info = "INVALID. There are no anchor elements in the current page"
+        cy.task("logCommand", {funtype: "Action: click anchor", info: info})
+    })
+}
+
+function clickRandButton(){
+    cy.window().then((win)=>{
+        let $buttons = win.document.getElementsByTagName("button");
+        let info = ""
+        if($buttons.length > 0){
+            let randomButton = $buttons.item(getRandomInt(0, $buttons.length));
+            if(!Cypress.dom.isHidden(randomButton)) {
+                cy.wrap(randomButton).click({force: true});
+                info = `Clicked button ${randomButton.textContent} with jsPath ${fullPath(randomButton)}`
+            } else info = `Button ${randomButton.textContent} is hidden`
+        } else info = "INVALID. There are no buttons in the current page" 
+        cy.task("logCommand", {funtype: "Action: click button", info: info})
+    })
+}
+
+function fillInput(){ //Or fill form
+    cy.window().then((win)=>{
+        let $inputs = win.document.getElementsByTagName("input");
+        let info = ""
+        if($inputs.length > 0){
+            var inp = $inputs.item(getRandomInt(0, $inputs.length));
+            //console.log(inp);
+            //console.log(inp.getAttribute("type"));
+            if(!Cypress.dom.isHidden(inp)) {
+                focused = true;
+                if(inp.getAttribute("type") == "email"){
+                    let type = faker.internet.email();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else if(inp.getAttribute("type") == "button" || inp.getAttribute("type") == "submit" || inp.getAttribute("type") == "radio" || inp.getAttribute("type") == "checkbox"){
+                    cy.wrap(inp).click();
+                    info = `Input ${inp.id} of type ${inp.getAttribute()} was clicked`
+                }
+                else if(inp.getAttribute("type") == "date"){
+                    let type = faker.date();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else if(inp.getAttribute("type") == "tel"){
+                    let type = faker.phone();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else if(inp.getAttribute("type") == "url"){
+                    let type = faker.internet.url();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else if(inp.getAttribute("type") == "number"){
+                    let type = faker.random.number();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else if(inp.getAttribute("type") == "text" || inp.getAttribute("type") == "password"){
+                    let type = faker.random.alphaNumeric();
+                    cy.wrap(inp).type(type);
+                    info = `Input ${inp.id} was filled with ${type}`
+                }
+                else {
+                    focused = false;
+                    info = `Input ${inp.id} is of type ${inp.getAttribute("type")}`
+                }
+            }
+            else info = `Input ${inp.id} is hidden`
+        }
+        else info = "INVALID. There are no input elements in the current page"        
+        console.log(info)
+        cy.task("logCommand", {funtype: "Action: click anchor", info: info})
+    })
+}
+function clearInput(){
+    cy.window().then((win)=>{
+        let info = ""
+        let inputs = win.document.getElementsByTagName("input")
+        if(inputs.length > 0){
+             var inp = inputs.item(getRandomInt(0, inputs.length));
+            if(!Cypress.dom.isHidden(inp)) {
+                cy.wrap(inp).clear();
+                focused = true;
+                info = `Cleared input ${inp.id}`
+            }
+            else info = `Input ${inp.id} is hidden`
+        }
+        else info = "INVALID. There are no input elements in the current page"
+        cy.task("logCommand", {funtype: "Action: click anchor", info: info})
+    })
+}
+function clearLocalStorage(){
+    cy.clearLocalStorage();
+    cy.task("logCommand", {funtype: "Chaos: Clear local storage", info: "Local storage is clear"})
+}
+function clearCookies(){
+    cy.clearCookies();
+    cy.task("logCommand", {funtype: "Chaos: Clear cookies", info: "Cookies are clear"})
+}
+
+//var screenshotIndex = 0;
+
+function randomEvent(){
+    let typeIndex = getRandomInt(0, pending_events.length);
+    if(pending_events[typeIndex] > 0){
+        //screenshotIndex += 1;
+        //cy.screenshot('smart/'+screenshotIndex+"-"+ getEvtType(typeIndex)+"-before");
+        let fIndex = getRandomInt(0, functions[typeIndex].length-1);
+        functions[typeIndex][fIndex]();
+        pending_events[typeIndex] --;
+        cy.wait(delay);
+        //cy.screenshot('smart/'+screenshotIndex+"-"+ getEvtType(typeIndex)+"-after");
+    }
+    else{
+        functions.splice(typeIndex, 1);
+        pending_events.splice(typeIndex, 1);
+    }
+}
+
 function getEvtType(i){
     if(i===0) return "Random click"
     else if (i===1) return "Scroll event"
@@ -475,7 +625,11 @@ function getEvtType(i){
     else if (i===3) return "Keypress"
     else if (i===4) return "Special Keypress"
     else if (i===5) return "Page Navigation"
+    else if (i===6) return "Browser Chaos"
+    else if (i===7) return "Action/Click"
 }
+
+var pending_events = [,,,,,,,]; 
 
 //Aggregate in a matrix-like constant
 const functions = [
@@ -484,39 +638,27 @@ const functions = [
     [randHover, tab], 
     [typeCharKey], 
     [spkeypress, enter], 
-    [reload, navBack, navForward, changeViewport]
-]
+    [reload, navBack, navForward],
+    [changeViewport, clearLocalStorage],
+    [fillInput, clearInput, clickRandAnchor, clickRandButton]
+];
 
-//var screenshotIndex = 0
+describe( `${appName} under smarter monkeys`, function() {
+    before(() => {
+        cy.visit('http://localhost:2368/ghost/#/signin')
+        cy.title('eq','Ghost Admin - My site Ghosh')
+        cy.wait(3000)
+        login('c.suarezg@uniandes.edu.co', 'Yuliana020708');
+        cy.url().should('include', '/ghost/#/dashboard');
+      });
 
-function randomEvent(){
-    let typeIndex = getRandomInt(0, pending_events.length)
-    if(pending_events[typeIndex] > 0){
-        //screenshotIndex +=1
-        //cy.screenshot('smart/'+screenshotIndex+"-"+ getEvtType(typeIndex)+"-before")
-        let fIndex = getRandomInt(0, functions[typeIndex].length-1)
-        functions[typeIndex][fIndex]()
-        pending_events[typeIndex] --
-        cy.wait(delay)
-        //cy.screenshot('smart/'+screenshotIndex+"-"+ getEvtType(typeIndex)+"-after")
-    }
-    else{
-        functions.splice(typeIndex, 1)
-        pending_events.splice(typeIndex, 1)
-        //randomEvent()
-    }
-}
-
-var pending_events = [,,,,,] 
-
-describe( `${appName} under monkeys`, function() {
-    //Listener
+    //Listeners
     cy.on('uncaught:exception', (err)=>{
-        cy.task('genericLog', {'message':`An exception occurred: ${err}`});
+        cy.task('genericLog', {'message':`An exception occurred: ${err}`})
         cy.task('genericReport', {'html': `<p><strong>Uncaught exception: </strong>${err}</p>`});
     });
     cy.on('window:alert', (text)=>{
-        cy.task('genericLog', {'message':`An alert was fired with the message: "${text}"`});
+        cy.task('genericLog', {'message':`An alert was fired with the message: "${text}"`})
         cy.task('genericReport', {'html': `<p><strong>An alert was fired with the message: </strong>${text}</p>`});
     });
     cy.on('fail', (err)=>{
@@ -524,21 +666,24 @@ describe( `${appName} under monkeys`, function() {
         cy.task('genericReport', {'html': `<p><strong>Test failed with the error: </strong>${err}</p>`});
         return false;
     });
-    it(`visits ${appName} and survives monkeys`, function() {
+    it(`visits ${appName} and survives smarter monkeys`, function() {
         if(!seed) seed = getRandomInt(0, Number.MAX_SAFE_INTEGER);
-
+        
         cy.task('logStart', {"type":"monkey", "url":url, "seed":seed})
         cy.log(`Seed: ${seed}`)
         cy.task('genericLog', {"message":`Seed: ${seed}`})
-        let pcg = pct_clicks+pct_scrolls+pct_keys+pct_pgnav+pct_selectors+pct_spkeys
+
+        let pcg = pct_clicks+pct_scrolls+pct_keys+pct_pgnav+pct_selectors+pct_spkeys+pct_actions+pct_browserChaos;
         if(pcg === 100){
 
-            pending_events[0] = events*pct_clicks/100
-            pending_events[1] = events*pct_scrolls/100
-            pending_events[2] = events*pct_selectors/100
-            pending_events[3] = events*pct_keys/100
-            pending_events[4] = events*pct_spkeys/100
-            pending_events[5] = events*pct_pgnav/100
+            pending_events[0] = events*pct_clicks/100;
+            pending_events[1] = events*pct_scrolls/100;
+            pending_events[2] = events*pct_selectors/100;
+            pending_events[3] = events*pct_keys/100;
+            pending_events[4] = events*pct_spkeys/100;
+            pending_events[5] = events*pct_pgnav/100;
+            pending_events[6] = events*pct_browserChaos/100;
+            pending_events[7] = events*pct_actions/100;
             
             cy.visit(url).then((win)=>{   
                 let d = win.document
@@ -547,20 +692,20 @@ describe( `${appName} under monkeys`, function() {
             })
             cy.wait(1000)
             //Add an event for each type of event in order to enter the else statement of randomEvent method
-            for(let i = 0; i < events + 5; i++){
+            for(let i = 0; i < events + 7; i++){
                 evtIndex++
                 randomEvent()
             }
         }
         else cy.task('logPctNo100')
-       
-    }) 
+        
+    })
+    
     afterEach(()=>{
         cy.task('logEnd')
     })
 })
 
-
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//End of random monkey
+//End of smart monkey
 //------------------------------------------------------------------------------------------------------------------------------------------------------------------------
